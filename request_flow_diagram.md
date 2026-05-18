@@ -41,7 +41,7 @@ FastAPI router receives request
   ↓
 health() endpoint runs
   ↓
-build_health_status()
+build_health_message()
   ↓
 JSON response returned to client
 ```

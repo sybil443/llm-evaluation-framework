@@ -1,20 +1,21 @@
 import logging
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from app.schemas import EchoRequest, EchoResponse
 
 app = FastAPI()
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-class EchoRequest(BaseModel):
-    message: str
 
 def build_hello_message() -> dict[str, str]:
     return {"message": "hello"}
 
-def build_echo_message(message:str) -> dict[str, str]:
-    return {"message": message}
+def build_health_message() -> dict[str, str]:
+    return {"status": "ok"}
+
+def build_echo_response(message: str) -> EchoResponse:
+    return EchoResponse(message=message)
 
 @app.get("/hello")
 def hello() -> dict[str, str]:
@@ -23,14 +24,18 @@ def hello() -> dict[str, str]:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return build_health_message()
     
-@app.post("/echo")
-def echo(request: EchoRequest) -> dict[str, str]:
-    logger.info("request received endpoint = echo")
+@app.post("/echo", response_model=EchoResponse)
+def echo(request: EchoRequest) -> EchoResponse:
+    logger.info("request received endpoint=echo")
 
-    response = build_echo_message(request.message)
-    logger.info("request_processed_successfully endpoint = echo")
+    if not request.message.strip():
+        logger.error("request_failed endpoint=echo reason=empty_message")
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    response = build_echo_response(request.message)
+    logger.info("request_processed_successfully endpoint=echo")
     return response
 
 

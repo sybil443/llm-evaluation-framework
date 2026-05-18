@@ -1,4 +1,4 @@
-from bootstrap_ci import bootstrap_mean_ci
+from evaluation.bootstrap_ci import bootstrap_mean_ci
 
 
 def test_bootstrap_mean_ci_is_reproducible_with_same_seed() -> None:

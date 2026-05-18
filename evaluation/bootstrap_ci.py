@@ -27,7 +27,7 @@ def bootstrap_mean_ci(
 
     Example:
         >>> bootstrap_mean_ci([1, 2, 3, 4, 5])
-        {'mean': 3.0, 'ci_lower': 2.0, 'ci_upper': 4.0}
+        {'ci_lower': 2.0, 'ci_upper': 4.0, 'n_bootstrap': 1000, 'confidence_level': 0.95, 'original_mean': 3.0, 'original_n': 5}
     """
     if not values:
         raise ValueError("Input values must not be empty")
