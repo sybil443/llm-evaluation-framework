@@ -1,5 +1,0 @@
-{
-    "app_name": "fastapi_starter",
-    "log_level": "INFO",
-    "environment": "local"
-}

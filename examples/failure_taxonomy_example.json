@@ -1,0 +1,18 @@
+{
+    "failure_tags": [
+        "quality",
+        "quality/factuality",
+        "quality/relevance",
+        "quality/completeness",
+        "safety",
+        "safety/privacy",
+        "safety/toxicity",
+        "format",
+        "format/json",
+        "format/citation",
+        "lexical",
+        "lexical/low_reference_overlap",
+        "comparison",
+        "comparison/example_regression"
+    ]
+}

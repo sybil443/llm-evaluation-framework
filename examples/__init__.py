@@ -1,0 +1,1 @@
+"""Offline examples; invoke using python -m examples.<module>."""
