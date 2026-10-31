@@ -4,26 +4,29 @@
 
 This checklist defines what needs to be true before the LLM evaluation framework is considered ready for a production-like deployment.
 
-The goal is not to claim that the current project is fully production deployed. The goal is to document the readiness criteria, known gaps, and next engineering steps needed to move from a local FastAPI evaluation project toward a more reliable ML evaluation service.
+The goal is not to claim that the current project is fully production deployed. The goal is to document the readiness criteria, the current status of each one, known gaps, and next engineering steps needed to move from a local FastAPI evaluation project toward a more reliable ML evaluation service.
 
+Status key: ✅ done · ⚠️ partial · ❌ not yet · ➖ not applicable at this stage
 
 ---
 
 ## 1. Application readiness
 
-| Check                                      | Status | Notes                                                   |
-| ------------------------------------------ | ------ | ------------------------------------------------------- |
-| FastAPI app starts locally                 |        | Confirm `uvicorn app.main:app --reload` works           |
-| Health endpoint exists                     |        | Confirm `/health` or equivalent endpoint works          |
-| Evaluation endpoint exists                 |        | Confirm `/v1/evaluations` or current route works        |
-| Route layer is thin                        |        | Route should delegate to service layer                  |
-| Service layer exists                       |        | Evaluation orchestration should live in `app/services/` |
-| Core logic is reusable                     |        | Core evaluation code should live in `evaluation/`       |
-| App does not contain metric logic directly |        | Metrics should stay outside route handlers              |
+| Check                                      | Status | Notes                                                                 |
+| ------------------------------------------ | ------ | --------------------------------------------------------------------- |
+| FastAPI app starts locally                 | ✅     | `python -m uvicorn app.main:app --reload`; exercised by `TestClient` in `tests/test_api.py` |
+| Health endpoint exists                     | ✅     | `/health`; tested in `tests/test_api.py`                              |
+| Evaluation endpoint exists                 | ✅     | `POST /v1/evaluations`                                                |
+| Route layer is thin                        | ✅     | `app/routes/evaluations.py` only validates, delegates and maps errors |
+| Service layer exists                       | ✅     | `app/services/evaluation_service.py` orchestrates and logs            |
+| Core logic is reusable                     | ✅     | `evaluation/` never imports FastAPI; the CLI uses the same pipeline   |
+| App does not contain metric logic directly | ✅     | All metrics live in `evaluation/`                                     |
 
 Readiness notes:
 
-```text id="e6t3vx"
+```text
+Local app readiness is met. A test confirms the API and the Python pipeline
+produce identical results for the same request.
 ```
 
 ---
@@ -32,7 +35,7 @@ Readiness notes:
 
 Relevant files:
 
-```text id="nm3rv8"
+```text
 app/main.py
 app/routes/evaluations.py
 app/schemas.py
@@ -43,21 +46,21 @@ tests/test_schemas.py
 
 Checklist:
 
-| Check                               | Status | Notes                                                   |
-| ----------------------------------- | ------ | ------------------------------------------------------- |
-| Request schema is explicit          |        | `EvaluationRequest` or equivalent schema exists         |
-| Response schema is explicit         |        | `EvaluationResponse` or equivalent schema exists        |
-| Required fields are validated       |        | Missing fields should produce validation errors         |
-| Blank required strings are rejected |        | Example IDs, prompts, and responses should not be blank |
-| Empty example lists are rejected    |        | Prevent meaningless evaluation runs                     |
-| Duplicate example IDs are handled   |        | Should be service/data-quality validation               |
-| Missing slice labels are handled    |        | Should be service/data-quality validation               |
-| API tests cover success path        |        | Valid request returns expected response                 |
-| API tests cover error paths         |        | Invalid requests return expected errors                 |
+| Check                               | Status | Notes                                                                    |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------ |
+| Request schema is explicit          | ✅     | `EvaluationRequest` in `evaluation/contracts.py`; unknown fields rejected |
+| Response schema is explicit         | ⚠️     | `EvaluationResponse` exists, but its `result` field is an untyped `dict` |
+| Required fields are validated       | ✅     | Pydantic returns HTTP 422 for missing or invalid fields                  |
+| Blank required strings are rejected | ✅     | Tested for IDs, prompts, references and slices in `tests/test_schemas.py` |
+| Empty example lists are rejected    | ⚠️     | Enforced by the schema (`min_length=1`); no dedicated test yet           |
+| Duplicate example IDs are handled   | ✅     | Rejected by the request schema; tested in `tests/test_api.py`            |
+| Missing slice labels are handled    | ✅     | `slice` is a required field; blank values tested                         |
+| API tests cover success path        | ✅     | `test_api_and_python_produce_identical_computed_results`                 |
+| API tests cover error paths         | ✅     | Blank identities, duplicate and unpaired IDs                             |
 
 Go / no-go:
 
-```text id="q9k4fd"
+```text
 Go only if request and response contracts are explicit and tested.
 ```
 
@@ -69,18 +72,18 @@ The service should avoid hard-coded production settings.
 
 Checklist:
 
-| Check                                     | Status | Notes                                                |
-| ----------------------------------------- | ------ | ---------------------------------------------------- |
-| Config file exists                        |        | `EvaluationConfig` in `evaluation/contracts.py`      |
-| Runtime settings are documented           |        | Include model name, judge name, rubric version, seed |
-| Random seed is explicit                   |        | Supports reproducibility                             |
-| Environment-specific values are separated |        | Local vs production settings                         |
-| Secrets are not committed                 |        | API keys should not appear in repo                   |
-| Defaults are safe                         |        | Local defaults should not imply production readiness |
+| Check                                     | Status | Notes                                                                    |
+| ----------------------------------------- | ------ | ------------------------------------------------------------------------ |
+| Config file exists                        | ✅     | `EvaluationConfig` in `evaluation/contracts.py`, validated with bounds   |
+| Runtime settings are documented           | ✅     | Model names, dataset version and full config are saved with every run    |
+| Random seed is explicit                   | ✅     | `config.seed` (default 42), recorded in results                          |
+| Environment-specific values are separated | ❌     | No environment-based settings yet; see the future list below             |
+| Secrets are not committed                 | ✅     | No secrets in the repo; `.env` files are gitignored                      |
+| Defaults are safe                         | ✅     | Synthetic data always yields `HOLD`; the decision is never "ship"        |
 
 Future production config should include:
 
-```text id="mps8br"
+```text
 APP_ENV
 LOG_LEVEL
 RUN_STORAGE_PATH
@@ -92,7 +95,10 @@ MAX_EXAMPLES_PER_REQUEST
 
 Readiness notes:
 
-```text id="mjbmoa"
+```text
+Evaluation settings are explicit and versioned per run. Service-level settings
+(environment, storage path, provider, timeouts) are not configurable yet; request
+limits are currently fixed in the schema.
 ```
 
 ---
@@ -101,19 +107,19 @@ Readiness notes:
 
 Relevant folder:
 
-```text id="wtkvhc"
+```text
 tests/
 ```
 
-Current test categories should include:
+Current test categories:
 
-| Area                   | Example test file                                                                      |
+| Area                   | Test file                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------- |
 | API behavior           | `tests/test_api.py`                                                                    |
 | Schema validation      | `tests/test_schemas.py`                                                                |
 | Data quality           | `tests/test_data_quality.py`                                                           |
 | Judge parsing          | `tests/test_judge_parser.py`                                                           |
-| Rubric validation      | `tests/test_rubric_schema.py`,`tests/test_rubric.py`                                   |
+| Rubric validation      | `tests/test_rubric_schema.py`, `tests/test_rubric.py`                                  |
 | LLM judge scaffold     | `tests/test_llm_judge.py`                                                              |
 | Judge calibration      | `tests/test_judge_calibration.py`                                                      |
 | Text metrics           | `tests/test_text_metrics.py`                                                           |
@@ -132,20 +138,20 @@ Current test categories should include:
 
 Checklist:
 
-| Check                                        | Status | Notes                                          |
-| -------------------------------------------- | ------ | ---------------------------------------------- |
-| Unit tests pass                              |        | Run `pytest`                                   |
-| API tests pass                               |        | Include valid and invalid requests             |
-| Error-path tests exist                       |        | Missing fields, bad data, invalid judge output |
-| Deterministic tests avoid external LLM calls |        | Placeholder judge keeps tests stable           |
-| Metrics tests include edge cases             |        | Empty input, zero vector, mismatched lengths   |
-| Calibration tests cover disagreements        |        | Label mismatch and score mismatch              |
-| Report-generation tests exist                |        | Prevent broken Markdown outputs                |
-| Test command is documented                   |        | README should include `pytest` command         |
+| Check                                        | Status | Notes                                                                 |
+| -------------------------------------------- | ------ | --------------------------------------------------------------------- |
+| Unit tests pass                              | ✅     | `pytest` runs in GitHub Actions on every push                         |
+| API tests pass                               | ✅     | Valid and invalid requests covered                                    |
+| Error-path tests exist                       | ✅     | Bad inputs, non-finite numbers, malformed judge output                |
+| Deterministic tests avoid external LLM calls | ✅     | No network calls; placeholder judge and fixtures only                 |
+| Metrics tests include edge cases             | ✅     | Empty input, zero vector, mismatched lengths                          |
+| Calibration tests cover disagreements        | ✅     | `find_disagreements` covers label and score mismatches                |
+| Report-generation tests exist                | ✅     | Committed report regenerated and diffed in CI                         |
+| Test command is documented                   | ✅     | README quick start                                                    |
 
 Go / no-go:
 
-```text id="azy2to"
+```text
 No deployment if the full test suite does not pass.
 ```
 
@@ -155,33 +161,33 @@ No deployment if the full test suite does not pass.
 
 Relevant files:
 
-```text id="k1gf10"
+```text
 evaluation/data_quality.py
 evaluation/contracts.py
 ```
 
 Checklist:
 
-| Check                                        | Status | Notes                                           |
-| -------------------------------------------- | ------ | ----------------------------------------------- |
-| Duplicate example IDs detected               |        | Prevent incorrect joins and aggregation         |
-| Blank prompts detected                       |        | Prevent meaningless evaluations                 |
-| Blank candidate responses detected           |        | Prevent invalid scoring                         |
-| Missing references handled                   |        | Should be warning or blocking depending on task |
-| Missing slice labels handled                 |        | Needed for slice-level analysis                 |
-| Metadata issues detected                     |        | Prevent broken reporting                        |
-| Blocking vs warning issues are distinguished |        | Not all issues should stop a run                |
-| Data-quality output is reportable            |        | Include issue codes and messages                |
+| Check                                        | Status | Notes                                                              |
+| -------------------------------------------- | ------ | ------------------------------------------------------------------ |
+| Duplicate example IDs detected               | ✅     | Blocking error                                                     |
+| Blank prompts detected                       | ✅     | Blocking error                                                     |
+| Blank candidate responses detected           | ✅     | Blocking error                                                     |
+| Missing references handled                   | ✅     | Warning in the checker; required by the reference-based API schema |
+| Missing slice labels handled                 | ✅     | Warning in the checker; required by the API schema                 |
+| Metadata issues detected                     | ✅     | Malformed metadata is a blocking error                             |
+| Blocking vs warning issues are distinguished | ✅     | Errors stop the run (HTTP 400); warnings are reported              |
+| Data-quality output is reportable            | ✅     | Issue codes and messages appear in results and the Markdown report |
 
 Readiness principle:
 
-```text id="ks1bdz"
+```text
 Evaluation quality depends on input quality.
 ```
 
 Go / no-go:
 
-```text id="t3b1su"
+```text
 No ship decision should rely on evaluation data that fails blocking data-quality checks.
 ```
 
@@ -191,7 +197,7 @@ No ship decision should rely on evaluation data that fails blocking data-quality
 
 Relevant files:
 
-```text id="sc5guv"
+```text
 evaluation/text_metrics.py
 evaluation/ab_testing.py
 evaluation/model_comparison.py
@@ -205,22 +211,22 @@ docs/practical_vs_statistical_significance_design.md
 
 Checklist:
 
-| Check                                  | Status | Notes                                                     |
-| -------------------------------------- | ------ | --------------------------------------------------------- |
-| Lexical metrics exist                  |        | BLEU-style precision, ROUGE-L, exact match, token overlap |
-| Semantic baseline exists               |        | Cosine similarity                                         |
-| Metrics have tests                     |        | Include normal and edge cases                             |
-| Metric limitations are documented      |        | Lexical vs semantic tradeoffs                             |
-| Paired comparison exists               |        | Compare model outputs on same examples                    |
-| Confidence intervals are available     |        | Avoid overclaiming differences                            |
-| Practical significance is documented   |        | Define meaningful effect-size thresholds                  |
-| Slice-level review is supported        |        | Avoid hiding regressions in aggregates                    |
-| Judge calibration exists               |        | Do not trust judge scores blindly                         |
-| Significance reporting language exists |        | Standardize cautious conclusions                          |
+| Check                                  | Status | Notes                                                                       |
+| -------------------------------------- | ------ | --------------------------------------------------------------------------- |
+| Lexical metrics exist                  | ✅     | ROUGE-L F1, unigram precision, token recall, exact-match accuracy           |
+| Semantic baseline exists               | ⚠️     | Manual synonym-count cosine only; no pretrained embeddings                  |
+| Metrics have tests                     | ✅     | Normal and edge cases                                                       |
+| Metric limitations are documented      | ✅     | `docs/lexical_vs_semantic_metrics_design.md`                                |
+| Paired comparison exists               | ✅     | Paired bootstrap over per-example differences                               |
+| Confidence intervals are available     | ✅     | Overall and per slice, with configurable confidence level                   |
+| Practical significance is documented   | ✅     | `minimum_effect` threshold and `evaluation/significance.py`                 |
+| Slice-level review is supported        | ✅     | Slice guardrail can force `HOLD` (see the demo report)                      |
+| Judge calibration exists               | ⚠️     | Implemented, but validated only on authored fixtures, not human labels      |
+| Significance reporting language exists | ✅     | Four fixed verdicts; cautious wording in the report                         |
 
 Go / no-go:
 
-```text id="y58r9n"
+```text
 A model comparison should not be judged only by one aggregate metric.
 ```
 
@@ -230,7 +236,7 @@ A model comparison should not be judged only by one aggregate metric.
 
 Relevant files:
 
-```text id="xdr7kx"
+```text
 evaluation/llm_judge.py
 evaluation/judge_parser.py
 evaluation/rubric_schema.py
@@ -241,21 +247,21 @@ docs/judge_calibration_workflow.md
 
 Checklist:
 
-| Check                                     | Status | Notes                                                 |
-| ----------------------------------------- | ------ | ----------------------------------------------------- |
-| Judge prompt scaffold exists              |        | Structured prompt construction                        |
-| Placeholder judge exists                  |        | Keeps tests deterministic                             |
-| Judge output parser exists                |        | Raw outputs must be parsed before use                 |
-| Rubric schema exists                      |        | Criteria and weights are validated                    |
-| Judge calibration exists                  |        | Compare judge labels/scores to expected labels/scores |
-| Disagreement analysis exists              |        | Identify label and score mismatches                   |
-| Judge calibration threshold is documented |        | Example: agreement rates above 0.80                   |
-| Raw judge outputs can be preserved        |        | Needed for debugging                                  |
-| Malformed judge output is handled         |        | Do not silently aggregate bad outputs                 |
+| Check                                     | Status | Notes                                                                     |
+| ----------------------------------------- | ------ | ------------------------------------------------------------------------- |
+| Judge prompt scaffold exists              | ✅     | Deterministic structured prompt requiring JSON output                     |
+| Placeholder judge exists                  | ✅     | Keeps tests deterministic                                                 |
+| Judge output parser exists                | ✅     | Strict: duplicate keys, unknown fields and out-of-range scores rejected   |
+| Rubric schema exists                      | ✅     | Pydantic-validated; weights must sum to 1.0                               |
+| Judge calibration exists                  | ✅     | Agreement, Cohen's kappa, MAE and correlation                             |
+| Disagreement analysis exists              | ✅     | `find_disagreements` lists label and score mismatches                     |
+| Judge calibration threshold is documented | ✅     | Default 0.80 label and score agreement; optional kappa minimum            |
+| Raw judge outputs can be preserved        | ⚠️     | Raw and parsed outputs saved in the demo; no live judge pipeline yet      |
+| Malformed judge output is handled         | ✅     | `JudgeParseError`; overall score recomputed from the rubric               |
 
 Go / no-go:
 
-```text id="fd0ic4"
+```text
 Do not use judge scores for release decisions unless judge calibration passes.
 ```
 
@@ -265,7 +271,7 @@ Do not use judge scores for release decisions unless judge calibration passes.
 
 Relevant files:
 
-```text id="d7exvc"
+```text
 evaluation/artifacts.py
 docs/persistence_state_handling_design.md
 docs/error_handling_service_reliability_note.md
@@ -273,36 +279,32 @@ docs/error_handling_service_reliability_note.md
 
 Checklist:
 
-| Check                                        | Status | Notes                                    |
-| -------------------------------------------- | ------ | ---------------------------------------- |
-| Run metadata is defined                      |        | `run_id`, model, judge, rubric, seed     |
-| Run artifacts are defined                    |        | Inputs, outputs, metrics, reports        |
-| Run directory structure is documented        |        | File-based first version                 |
-| Idempotency rules are documented             |        | Avoid silent overwrite of completed runs |
-| Failed-run behavior is documented            |        | Preserve partial artifacts               |
-| Report artifact is produced                  |        | Markdown report or template              |
-| Raw inputs can be connected to final outputs |        | Needed for auditability                  |
-| Future run manifest is documented            |        | Track artifact paths and status          |
+| Check                                        | Status | Notes                                                                  |
+| -------------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| Run metadata is defined                      | ✅     | Run ID, dataset name/version, model names, config, seed, pipeline version |
+| Run artifacts are defined                    | ✅     | Request, per-example results, report, demos, manifest                  |
+| Run directory structure is documented        | ✅     | See below and `docs/persistence_state_handling_design.md`              |
+| Idempotency rules are documented             | ✅     | An existing run ID is rejected; a per-run lock prevents collisions     |
+| Failed-run behavior is documented            | ✅     | Incomplete runs are discarded; only completed runs are published       |
+| Report artifact is produced                  | ✅     | `report.md`                                                            |
+| Raw inputs can be connected to final outputs | ✅     | Request and dataset SHA-256 hashes; per-example rows                   |
+| Run manifest exists                          | ✅     | `manifest.json` with file hashes, source fingerprint and status        |
 
-Suggested run directory:
+Run directory written by the CLI:
 
-```text id="p9lqzn"
+```text
 runs/
-  eval-run-001/
-    run_config.json
-    input_examples.jsonl
-    data_quality_results.json
-    judge_outputs.jsonl
-    parsed_results.jsonl
-    calibration_summary.json
-    metrics_summary.json
+  portfolio-demo-v1/
+    request.json
+    results.json
     report.md
-    run_manifest.json
+    workflow_demos.json
+    manifest.json
 ```
 
 Go / no-go:
 
-```text id="ua99zd"
+```text
 Do not treat an evaluation as production-ready unless inputs, outputs, and reports are traceable.
 ```
 
@@ -314,21 +316,21 @@ Observability is mostly a future extension, but the readiness criteria should be
 
 Checklist:
 
-| Check                                 | Status | Notes                                 |
-| ------------------------------------- | ------ | ------------------------------------- |
-| Structured logging plan exists        |        | Include run ID and request ID         |
-| Request ID strategy exists            |        | Needed for tracing API calls          |
-| Error logs are structured             |        | Avoid unsearchable stack traces only  |
-| Latency metrics are planned           |        | Track request and evaluation runtime  |
-| Evaluation success rate is planned    |        | Track completed vs failed runs        |
-| Judge parsing failures are tracked    |        | Important for LLM judge reliability   |
-| Data-quality issue counts are tracked |        | Useful for monitoring dataset quality |
-| Calibration failures are tracked      |        | Avoid judge drift                     |
-| Metric drift is planned               |        | Useful for long-term model monitoring |
+| Check                                 | Status | Notes                                                                 |
+| ------------------------------------- | ------ | --------------------------------------------------------------------- |
+| Structured logging plan exists        | ⚠️     | JSON log events per run with run ID; no request ID                    |
+| Request ID strategy exists            | ❌     | Not implemented                                                       |
+| Error logs are structured             | ⚠️     | `evaluation_failed` event with error type; unexpected errors use default logging |
+| Latency metrics are planned           | ⚠️     | `duration_ms` logged per run; no metrics backend                      |
+| Evaluation success rate is planned    | ⚠️     | Completed and failed events logged; not aggregated                    |
+| Judge parsing failures are tracked    | ❌     | No live judge yet                                                     |
+| Data-quality issue counts are tracked | ⚠️     | `quality_issue_count` logged per run; no trend tracking               |
+| Calibration failures are tracked      | ❌     | Calibration runs only in the demo                                     |
+| Metric drift is planned               | ⚠️     | Designed in `docs/monitoring_and_lifecycle.md`; not implemented       |
 
 Future operational metrics:
 
-```text id="q7wqmh"
+```text
 request_count
 request_latency_seconds
 evaluation_run_duration_seconds
@@ -342,7 +344,7 @@ report_generation_failure_rate
 
 Go / no-go:
 
-```text id="vgr99j"
+```text
 A production service should expose enough logs and metrics to debug failures.
 ```
 
@@ -352,20 +354,20 @@ A production service should expose enough logs and metrics to debug failures.
 
 Checklist:
 
-| Check                                         | Status | Notes                                          |
-| --------------------------------------------- | ------ | ---------------------------------------------- |
-| No secrets committed                          |        | API keys should not be in Git                  |
-| `.env` files ignored                          |        | Add to `.gitignore`                            |
-| External model keys are environment variables |        | Future real judge integration                  |
-| Input data sensitivity is considered          |        | Evaluation examples may contain sensitive text |
-| Raw judge prompts are handled carefully       |        | Prompts may include user or business data      |
-| Error responses avoid leaking internals       |        | No stack traces in API responses               |
-| Access control plan exists                    |        | Needed before multi-user deployment            |
-| Data retention policy is considered           |        | Run artifacts may contain sensitive records    |
+| Check                                         | Status | Notes                                                                 |
+| --------------------------------------------- | ------ | --------------------------------------------------------------------- |
+| No secrets committed                          | ✅     | None in Git history                                                   |
+| `.env` files ignored                          | ✅     | `.env` and `.env.*` in `.gitignore`                                   |
+| External model keys are environment variables | ➖     | No external provider is called yet                                    |
+| Input data sensitivity is considered          | ⚠️     | Logs exclude raw prompts and responses; run artifacts store them      |
+| Raw judge prompts are handled carefully       | ⚠️     | Only synthetic fixtures today; no redaction or access controls        |
+| Error responses avoid leaking internals       | ✅     | Validation and data-quality errors return messages, not stack traces  |
+| Access control plan exists                    | ⚠️     | Required in the production design docs; not implemented               |
+| Data retention policy is considered           | ❌     | No formal retention policy                                            |
 
-Recommended `.gitignore` entries:
+Recommended `.gitignore` entries (all present):
 
-```text id="s3f3l2"
+```text
 .env
 *.env
 __pycache__/
@@ -375,7 +377,7 @@ __pycache__/
 
 Go / no-go:
 
-```text id="g8og56"
+```text
 Do not connect real model providers or sensitive datasets until secrets and data-handling rules are clear.
 ```
 
@@ -385,7 +387,7 @@ Do not connect real model providers or sensitive datasets until secrets and data
 
 Relevant docs:
 
-```text id="w3e2ga"
+```text
 README.md
 docs/architecture_one_pager.md
 docs/lexical_vs_semantic_metrics_design.md
@@ -400,23 +402,23 @@ docs/monitoring_and_lifecycle.md
 
 README should include:
 
-| Section              | Status | Notes                                        |
-| -------------------- | ------ | -------------------------------------------- |
-| Project overview     |        | What the project does                        |
-| Architecture summary |        | Explain `app → evaluation`                   |
-| Repository structure |        | Show major folders                           |
-| Local setup          |        | Install dependencies                         |
-| Run command          |        | FastAPI command                              |
-| Test command         |        | `pytest`                                     |
-| API example          |        | Example request                              |
-| Core features        |        | Metrics, rubric, judge, calibration, reports |
-| Design notes         |        | Link to docs                                 |
-| Known limitations    |        | Be clear about non-production gaps           |
-| Future improvements  |        | Roadmap                                      |
+| Section              | Status | Notes                                                        |
+| -------------------- | ------ | ------------------------------------------------------------ |
+| Project overview     | ✅     | Opening paragraph and status line                            |
+| Architecture summary | ✅     | `app -> evaluation` dependency direction                     |
+| Repository structure | ⚠️     | Folders described in prose; no directory tree                |
+| Local setup          | ✅     | Quick start                                                  |
+| Run command          | ✅     | API and CLI commands                                         |
+| Test command         | ✅     | `python -m pytest -q`                                        |
+| API example          | ✅     | `curl` request to `/v1/evaluations`                          |
+| Core features        | ✅     | Implemented capabilities table                               |
+| Design notes         | ✅     | Links to all design docs                                     |
+| Known limitations    | ✅     | Current limits section                                       |
+| Future improvements  | ⚠️     | Gaps listed; production extensions are in the docs, not the README |
 
 Go / no-go:
 
-```text id="s0nj6g"
+```text
 A reviewer should be able to understand, run, and test the project from the README.
 ```
 
@@ -428,14 +430,11 @@ Current known limitations:
 
 * no real external LLM judge integration yet
 * placeholder judge is deterministic but not realistic
-* persistence design is documented but not fully implemented
+* run persistence is local files only; no database-backed run history
 * asynchronous run workflow is not implemented
 * observability is limited to structured run-level log events; no metrics backend or dashboards
 * authentication and authorization are not implemented
-* run artifact storage is not yet productionized
-* no database-backed run history
 * no deployment configuration such as Docker; CI runs tests and the offline demo only
-* no production monitoring dashboard
 * no formal data retention policy
 
 These are acceptable for the current project stage if they are documented clearly.
@@ -444,25 +443,27 @@ These are acceptable for the current project stage if they are documented clearl
 
 ## 13. Go / no-go checklist
 
-| Area                  | Go condition                                                 |
-| --------------------- | ------------------------------------------------------------ |
-| Tests                 | Full `pytest` suite passes                                   |
-| API                   | Main evaluation endpoint works                               |
-| Schema                | Request/response contracts are explicit                      |
-| Data quality          | Blocking issues are detected                                 |
-| Metrics               | Lexical and semantic baseline metrics are tested             |
-| Statistical reporting | Confidence intervals and practical thresholds are documented |
-| Judge                 | Judge parser, rubric schema, and calibration exist           |
-| Reports               | Report template or generator exists                          |
-| Persistence           | State-handling design is documented                          |
-| Security              | No secrets committed                                         |
-| Documentation         | README explains how to run and test                          |
-| Limitations           | Known gaps are clearly stated                                |
+| Area                  | Go condition                                                 | Local demo |
+| --------------------- | ------------------------------------------------------------ | ---------- |
+| Tests                 | Full `pytest` suite passes                                   | ✅         |
+| API                   | Main evaluation endpoint works                               | ✅         |
+| Schema                | Request/response contracts are explicit                      | ✅         |
+| Data quality          | Blocking issues are detected                                 | ✅         |
+| Metrics               | Lexical and semantic baseline metrics are tested             | ✅         |
+| Statistical reporting | Confidence intervals and practical thresholds are documented | ✅         |
+| Judge                 | Judge parser, rubric schema, and calibration exist           | ✅         |
+| Reports               | Report template or generator exists                          | ✅         |
+| Persistence           | State-handling design is documented                          | ✅         |
+| Security              | No secrets committed                                         | ✅         |
+| Documentation         | README explains how to run and test                          | ✅         |
+| Limitations           | Known gaps are clearly stated                                | ✅         |
 
 Decision:
 
-```text id="sz8fc3"
-Local demo readiness: Go if tests pass and README is clear.
+```text
+Local demo readiness: Go. All local conditions above are met.
 
-Production readiness: No-go until persistence, observability, security, async execution, and real deployment configuration are implemented.
+Production readiness: No-go until environment-based configuration, request
+tracing, a metrics backend, authentication, a database for run history,
+async execution, and real deployment configuration are implemented.
 ```

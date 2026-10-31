@@ -49,7 +49,3 @@ def test_api_scores_change_when_challenger_changes():
     assert response.status_code == 200
     assert response.json()["result"]["metric_means"]["challenger"]["rouge_l_f1"] == 0
     assert response.json()["result"]["decision"]["status"] == "HOLD"
-
-
-def test_echo_rejects_blank_text():
-    assert client.post("/echo", json={"message": " "}).status_code == 400

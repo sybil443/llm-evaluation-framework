@@ -51,7 +51,7 @@ call can validate structure but cannot infer a criterion's permitted range.
 
 Beyond the exact-label-agreement rate and within-tolerance score-agreement
 rate, `evaluation/judge_calibration.py`'s `summarize_calibration_results`
-now also computes:
+computes:
 
 | Metric | What it adds beyond raw agreement rate |
 |---|---|

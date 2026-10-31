@@ -52,8 +52,7 @@ curl -sS http://127.0.0.1:8000/v1/evaluations \
 ```
 
 `POST /v1/evaluations` returns `result` and `report_markdown`. It computes actual
-metrics and does not save files. The CLI saves local artifacts. `/health`,
-`/hello`, and `/echo` remain available.
+metrics and does not save files. The CLI saves local artifacts. `/health` remains available.
 
 ## Implemented capabilities
 

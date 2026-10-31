@@ -35,15 +35,15 @@ The CLI calls that same pipeline and then the local artifact writer.
 | `failure_taxonomy.py` | Validates and aggregates failure tags against a shared vocabulary |
 | `anomaly_detection.py` | Robust (median/MAD) statistical outlier flags over metrics and response length |
 | `significance.py` | Reusable practical-vs-statistical classification, on top of `statistics.py` |
-
-Two other bootstrap entry points (`bootstrap_ci.py`, used only by
-`ab_compare.py`) and a second report formatter (`report_generator.py`,
-which required a `judge_name` field the current contract removed) used to
-sit alongside `statistics.py` and `comparison_report.py`, reachable only
-from their own tests and not from the API, CLI, or any demo. They were
-removed rather than kept as unused duplicates; `statistics.py` is the one
-bootstrap implementation and `comparison_report.py` is the one report
-formatter actually used end to end.
+| `text_metrics.py` | ROUGE-L, unigram precision, token recall, cosine similarity, exact-match accuracy |
+| `ab_testing.py` | Independent-group two-proportion z-test, rate-difference interval, ship/hold rule |
+| `model_comparison.py` | Report-ready paired comparison and latency/batch-size helpers |
+| `data_quality.py` | Blocking and warning-level input checks |
+| `metrics_summary.py` | Per-metric means and slice counts |
+| `rubric_schema.py` | Pydantic-validated rubric loading and weighted scoring |
+| `llm_judge.py` | Deterministic judge prompt construction; no live model call |
+| `judge_calibration.py` | Agreement, Cohen's kappa, MAE, correlation and calibration gate |
+| `tag_trie.py` | Prefix lookup over failure-tag names |
 
 ## Proposed production extensions
 

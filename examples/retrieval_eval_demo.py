@@ -26,7 +26,7 @@ def run_retrieval_demo():
         n_queries=len(QUERIES),
         ks=list(DEFAULT_KS),
         substring_search_before=dict(
-            method="search_by_keyword (pre-existing, unranked, exact substring)",
+            method="search_by_keyword (unranked, exact substring)",
             rankings=keyword_before,
             note="Requires the whole query to appear verbatim in the text; "
                  "returns nothing for every multi-word fixture query. Shown "

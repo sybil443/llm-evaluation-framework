@@ -13,9 +13,6 @@ real corpus, real queries, or real user relevance judgments.
 | Runnable demo | `examples/retrieval_eval_demo.py` | Builds the index, ranks with two retrievers, scores, compares, returns a JSON-serializable result |
 | Wiring | `examples/run_llm_eval.py` | `run_retrieval_demo()` output is saved under `workflow_demos.json` alongside the judge and A/B demos |
 
-The pre-existing `search_by_keyword` and `search_by_metadata` methods are
-unchanged; every existing test for them still passes. `search` is additive.
-
 ## Why BM25, and why not compared against `search_by_keyword` directly
 
 `search_by_keyword` does a case-insensitive substring match of the *entire*
@@ -26,8 +23,7 @@ strawman: it returns an empty result for every multi-word query in the
 fixture corpus, because none of the documents happen to contain the query as
 a literal substring. `examples/retrieval_eval_demo.py` still runs it and
 reports the (empty) results under `substring_search_before`, purely as
-descriptive context for what the pre-existing capability could and could not
-do.
+descriptive context for what exact-substring search can and cannot do.
 
 The quantitative comparison instead pits BM25 against `term_overlap_rankings`
 (defined in `examples/retrieval_fixture.py`): a naive but real ranking

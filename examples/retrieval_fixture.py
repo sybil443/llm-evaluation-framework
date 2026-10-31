@@ -2,9 +2,9 @@
 
 No real search engine or user click data produced these documents,
 queries, or relevance grades. They are hand-authored to exercise ranking
-metrics against three retrieval strategies already in this repo:
+metrics against three retrieval strategies:
 
-  - `search_by_keyword`, the pre-existing unranked substring lookup on
+  - `search_by_keyword`, the unranked substring lookup on
     `InMemorySearchIndex`. It requires the whole (normalized) query to
     appear verbatim in the text, so real multi-word queries usually
     match nothing. It is included below only as a descriptive "before"
@@ -72,7 +72,7 @@ JUDGMENTS = {
 
 
 def keyword_rankings(index: InMemorySearchIndex, *, k: int = 10) -> dict[str, list[str]]:
-    """Descriptive only: pre-existing unranked substring keyword search.
+    """Descriptive only: unranked substring keyword search.
 
     Not used as the comparison baseline (see module docstring) because it
     requires an exact substring match and returns nothing for realistic
