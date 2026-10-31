@@ -1,4 +1,5 @@
-# LLM / Model Evaluation Framework
+# LLM Evaluation Framework: Baseline vs. Challenger Comparison
+![Tests](https://github.com/sybil443/llm-evaluation-framework/actions/workflows/tests.yml/badge.svg)
 
 A modular Python toolkit and FastAPI service for comparing supplied baseline and
 challenger responses. The same pipeline runs through HTTP and the command line.
@@ -54,13 +55,6 @@ curl -sS http://127.0.0.1:8000/v1/evaluations \
 metrics and does not save files. The CLI saves local artifacts. `/health`,
 `/hello`, and `/echo` remain available.
 
-**Contract migration:** the earlier placeholder request is replaced. Requests
-now contain `dataset_name`, `dataset_version`, `data_kind`, `provenance`,
-`baseline_name`, `challenger_name`, `examples`, `baseline`, `challenger`, and
-`config`. Each example has a required reference and slice. Both output lists
-must contain exactly those example IDs. Settings such as `seed` live in `config`.
-The old `judge_name`, `rubric_version`, and placeholder score fields are removed.
-
 ## Implemented capabilities
 
 | Capability | Evidence |
@@ -69,10 +63,12 @@ The old `judge_name`, `rubric_version`, and placeholder score fields are removed
 | Input quality and ID pairing | `evaluation/contracts.py`, `evaluation/data_quality.py` |
 | Lexical metrics | Unigram precision, ROUGE-L F1, token recall in `evaluation/text_metrics.py` |
 | Semantic baseline | `evaluation/semantic.py`: cosine over manually defined synonym-count vectors |
-| Paired comparison | One canonical bootstrap in `evaluation/statistics.py` |
-| Independent-group A/B utility | `examples/ab_demo.py`; illustrative counts, not an online experiment |
+| Paired model comparison | Paired bootstrap in `evaluation/statistics.py`; report-ready comparison and latency trade-offs in `evaluation/model_comparison.py` |
+| A/B testing | Two-proportion z-test, rate-difference interval and ship/hold rule in `evaluation/ab_testing.py`; demo with illustrative counts in `examples/ab_demo.py` |
 | Metrics and slice summaries | `evaluation/metrics_summary.py`, `evaluation/pipeline.py` |
-| Failure review and retrieval | Keyword / metadata search over actual evaluation records |
+| Retrieval evaluation | BM25 ranking with keyword and metadata search (`evaluation/search_index.py`); precision/recall@k, MRR, nDCG@k and paired retriever comparison (`evaluation/retrieval_metrics.py`) |
+| Failure analysis | Failure-tag taxonomy (`evaluation/failure_taxonomy.py`) and robust outlier flags for anomalous outputs (`evaluation/anomaly_detection.py`) |
+| Practical vs. statistical significance | One classification reused across text and retrieval comparisons (`evaluation/significance.py`) |
 | Judge workflow design | `examples/judge_workflow.py`: prompt, fixture JSON, strict parsing, rubric-derived score, calibration |
 | Local reproducibility | Input/config hashes, source fingerprint, dependency versions, per-example results, reports |
 | Automated verification | Unit and integration tests, offline demo, committed-report check, GitHub Actions |
@@ -121,6 +117,8 @@ imports FastAPI. `examples/` supplies fixtures and orchestration for demonstrati
 - [Errors and reliability](docs/error_handling_service_reliability_note.md)
 - [Monitoring and model lifecycle design](docs/monitoring_and_lifecycle.md)
 - [Deployment readiness](docs/deployment_readiness_checklist.md)
+- [Retrieval evaluation](docs/retrieval_evaluation_design.md)
+- [Failure analysis and anomalous outputs](docs/failure_analysis_design.md)
 
 ## Current limits
 
@@ -130,4 +128,4 @@ Input limits bound this small demonstration; they are not full production resour
 controls. Do not expose the development server publicly. See the deployment design
 for the separate production requirements.
 
-The author has not selected an open-source license; see the publishing checklist.
+Licensed under the MIT License; see [LICENSE](LICENSE).
