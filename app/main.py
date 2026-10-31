@@ -1,5 +1,5 @@
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from app.routes.evaluations import router
 
 app = FastAPI(
@@ -8,6 +8,7 @@ app = FastAPI(
 )
 app.include_router(router, prefix="/v1")
 logging.basicConfig(level=logging.INFO)
+
 
 @app.get("/health")
 def health() -> dict[str, str]:
